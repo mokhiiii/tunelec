@@ -169,6 +169,15 @@
         let currentStep = 0;
         const responses = questions.map(q => ({ ...q, answer: '', comment: '' }));
 
+        // Default to deployed backend; override via window.TUNELEC_API_BASE when needed.
+        const API_BASE = window.TUNELEC_API_BASE || 'https://tunelec.onrender.com';
+        function apiUrl(path) {
+            if (!API_BASE) return path;
+            const base = API_BASE.replace(/\/$/, '');
+            const cleanPath = path.replace(/^\//, '');
+            return `${base}/${cleanPath}`;
+        }
+
         // Calculate compliance percentage
         function calculatePercentage() {
             const yesCount = responses.filter(r => r.answer === 'Oui').length;
@@ -201,7 +210,7 @@
         }        // Load and display question image
         async function loadQuestionImage(questionId) {
             try {
-                const response = await fetch(`get_question_image.php?question_id=${questionId}`);
+                const response = await fetch(apiUrl(`get_question_image.php?question_id=${questionId}`));
                 const data = await response.json();
                 const imageContainer = document.getElementById('question-image');
                 
@@ -394,7 +403,7 @@
                 loadingMsg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1);z-index:1000;';
                 document.body.appendChild(loadingMsg);
 
-                const response = await fetch('generate_filled_excel.php', {
+                const response = await fetch(apiUrl('generate_filled_excel.php'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

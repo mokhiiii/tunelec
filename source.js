@@ -17,10 +17,19 @@ let auditInfo = {
     answers: {}
 };
 
+// Default to deployed backend; override via window.TUNELEC_API_BASE when needed.
+const API_BASE = window.TUNELEC_API_BASE || 'https://tunelec.onrender.com';
+function apiUrl(path) {
+    if (!API_BASE) return path;
+    const base = API_BASE.replace(/\/$/, '');
+    const cleanPath = path.replace(/^\//, '');
+    return `${base}/${cleanPath}`;
+}
+
 // Function to load image for a question
 async function loadQuestionImage(questionId) {
     try {
-        const response = await fetch(`image_handler.php?question_id=${questionId}`);
+        const response = await fetch(apiUrl(`image_handler.php?question_id=${questionId}`));
         const data = await response.json();
         
         if (data.success) {
