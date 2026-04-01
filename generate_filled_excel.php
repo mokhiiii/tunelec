@@ -5,87 +5,109 @@ ob_start();
 // Enable error logging to file
 ini_set('log_errors', 1);
 ini_set('error_log', 'php_errors.log');
-error_reporting(E_ALL);
 
 require 'vendor/autoload.php';
+require 'config.php';
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 // Set JSON header
 header('Content-Type: application/json');
 
 try {
-    $mysqli = new mysqli("localhost", "root", "", "excel_data");
-    if ($mysqli->connect_error) {
-        throw new Exception("Database connection failed: " . $mysqli->connect_error);
-    }
-
     // Get POSTed JSON data
     $jsonInput = file_get_contents('php://input');
     if (empty($jsonInput)) {
-        throw new Exception('No data received in request');
+        http_response_code(400);
+        echo json_encode(['error' => 'No data received in request']);
+        exit;
     }
 
     $data = json_decode($jsonInput, true);
     if (json_last_error() !== JSON_ERROR_NONE) {
-        throw new Exception('JSON decode error: ' . json_last_error_msg());
+        http_response_code(400);
+        echo json_encode(['error' => 'JSON decode error: ' . json_last_error_msg()]);
+        exit;
     }
 
-    // Fetch template using prepared statement
-    $stmt = $mysqli->prepare("SELECT filename, filedata FROM templates ORDER BY id DESC LIMIT 1");
-    $stmt->execute();
-    $result = $stmt->get_result();
+    // Try to fetch template from Supabase 
+    $filedata = null;
+    $filename = 'audit_report.xlsx';
     
-    if (!$result || $result->num_rows === 0) {
-        throw new Exception("No template found in database");
+    try {
+        $db = new Supabase('templates');
+        $templates = $db->select('order=id.desc&limit=1');
+        
+        if ($templates && count($templates) > 0) {
+            $template = $templates[0];
+            // Decode if stored as base64
+            $filedata = base64_decode($template['filedata']);
+            $filename = $template['filename'] ?? 'audit_report.xlsx';
+        }
+    } catch (Exception $e) {
+        error_log("Template fetch error (non-critical): " . $e->getMessage());
+        // Continue without template - will create blank spreadsheet
     }
-
-    $row = $result->fetch_assoc();
-    $filedata = $row['filedata'];
-    $filename = $row['filename'];
 
     if (empty($filedata)) {
-        throw new Exception("Template file data is empty");
+        error_log("No template found, will create blank spreadsheet");
+        // Create a minimal blank template instead of failing
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Audit Report');
+    } else {
+
+    if (empty($filedata)) {
+        error_log("No template found, will create blank spreadsheet");
+        // Create a minimal blank template instead of failing
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Audit Report');
+    } else {
+        // Clear output buffer
+        ob_end_clean();
+
+        // Create a temporary directory
+        $tempDir = sys_get_temp_dir() . '/excel_template_' . uniqid();
+        mkdir($tempDir);
+        
+        // Create temporary Excel file
+        $tempFile = $tempDir . '/template.xlsx';
+        file_put_contents($tempFile, $filedata);
+
+        try {
+            // Load the spreadsheet with settings to preserve images
+            $reader = IOFactory::createReader('Xlsx');
+            $reader->setIncludeCharts(true);
+            $reader->setReadDataOnly(false);
+            $spreadsheet = $reader->load($tempFile);
+            $sheet = $spreadsheet->getActiveSheet();
+        } catch (Exception $e) {
+            error_log("Template load error: " . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to load template: ' . $e->getMessage()]);
+            exit;
+        }
     }
 
-    // Clear output buffer
-    ob_end_clean();
-
-    // Create a temporary directory
-    $tempDir = sys_get_temp_dir() . '/excel_template_' . uniqid();
-    mkdir($tempDir);
+    // Fill audit info (adjust these cell references according to your template)
+    $auditInfo = $data['auditInfo'] ?? [];
     
-    // Create temporary Excel file
-    $tempFile = $tempDir . '/template.xlsx';
-    file_put_contents($tempFile, $filedata);
-
-    try {
-        // Load the spreadsheet with settings to preserve images
-        $reader = IOFactory::createReader('Xlsx');
-        $reader->setIncludeCharts(true);
-        $reader->setReadDataOnly(false);
-        $spreadsheet = $reader->load($tempFile);
-
-        $sheet = $spreadsheet->getActiveSheet();
-
-        // Fill audit info (adjust these cell references according to your template)
-        $auditInfo = $data['auditInfo'];
-        
-        // Capitalize first letter of atelier if it exists
-        $atelier = '';
-        if (isset($auditInfo['atelier']) && !empty($auditInfo['atelier'])) {
-            $atelier = ucfirst(strtolower($auditInfo['atelier']));
-            if ($atelier === 'Electronique') {
-                $atelier = 'Électronique'; // Fix special character
-            }
+    // Capitalize first letter of atelier if it exists
+    $atelier = '';
+    if (isset($auditInfo['atelier']) && !empty($auditInfo['atelier'])) {
+        $atelier = ucfirst(strtolower($auditInfo['atelier']));
+        if ($atelier === 'Electronique') {
+            $atelier = 'Électronique'; // Fix special character
         }
-        
-        $sheet->setCellValue('C3', $atelier);
-        $sheet->setCellValue('D4', $auditInfo['auditeur'] ?? '');
-        $sheet->setCellValue('F3', $auditInfo['zone'] ?? '');
-        $sheet->setCellValue('J3', 'date');
-        $sheet->setCellValue('K3', $auditInfo['date'] ?? '');
-        $sheet->setCellValue('D5', $auditInfo['audite'] ?? '');
-        $sheet->setCellValue('F5', $auditInfo['produit'] ?? '');
+    }
+    
+    $sheet->setCellValue('C3', $atelier);
+    $sheet->setCellValue('D4', $auditInfo['auditeur'] ?? '');
+    $sheet->setCellValue('F3', $auditInfo['zone'] ?? '');
+    $sheet->setCellValue('J3', 'date');
+    $sheet->setCellValue('K3', $auditInfo['date'] ?? '');
+    $sheet->setCellValue('D5', $auditInfo['audite'] ?? '');
+    $sheet->setCellValue('F5', $auditInfo['produit'] ?? '');
 
         // Question row mapping - updated to include all questions
         $questionRows = array(
@@ -186,40 +208,17 @@ try {
         header('Content-Disposition: attachment; filename="Audit_Tunelec_'.date('Y-m-d_H-i-s').'.xlsx"');
         header('Cache-Control: max-age=0');
 
-        // Create writer with settings to preserve images
+        // Create writer
         $writer = IOFactory::createWriter($spreadsheet, 'Xlsx');
-        $writer->setIncludeCharts(true);
         $writer->setPreCalculateFormulas(false);
         
-        // Save to temporary file first
-        $outputFile = $tempDir . '/output.xlsx';
-        $writer->save($outputFile);
-        
-        // Read and output the file
-        readfile($outputFile);
-        
-        // Clean up
-        unlink($outputFile);
-        unlink($tempFile);
-        rmdir($tempDir);
-        
+        // Save and output
+        $writer->save('php://output');
         exit;
-
-    } catch (Exception $e) {
-        // Clean up on error
-        if (file_exists($tempFile)) {
-            unlink($tempFile);
-        }
-        if (file_exists($tempDir)) {
-            rmdir($tempDir);
-        }
-        throw new Exception('Error processing Excel file: ' . $e->getMessage());
-    }
 
 } catch (Exception $e) {
     error_log("Error in generate_filled_excel.php: " . $e->getMessage());
     
-    header('Content-Type: application/json');
     http_response_code(500);
     echo json_encode([
         'success' => false,
