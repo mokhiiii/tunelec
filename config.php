@@ -12,12 +12,13 @@
  * - Handles CORS headers if API request
  */
 
-// Enable error reporting (disable in production)
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
-// Load environment variables
+// Load environment variables first
 require_once __DIR__ . '/env-loader.php';
+
+// Enable strict errors locally, hide details in production
+$appEnv = getenv('APP_ENV') ?: 'development';
+error_reporting(E_ALL);
+ini_set('display_errors', $appEnv === 'production' ? '0' : '1');
 
 // Load Supabase helper
 require_once __DIR__ . '/supabase.php';

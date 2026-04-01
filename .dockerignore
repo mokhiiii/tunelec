@@ -1,0 +1,12 @@
+.git
+.gitignore
+.vscode
+.idea
+new_venv
+__pycache__
+*.pyc
+.env
+.env.local
+.env.*.local
+generated_files
+temp
