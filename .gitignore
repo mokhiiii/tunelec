@@ -1,0 +1,8 @@
+# Ignore everything inside vendor/
+vendor/**
+
+# But don't ignore the vendor/template/ directory
+!vendor/template/
+
+# And don't ignore any files inside vendor/template/
+!vendor/template/**

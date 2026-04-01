@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Checklist - Tunelec</title>
+    <link rel="icon" type="image/x-icon" href="public/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="public/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white shadow-2xl rounded-3xl p-8 w-full max-w-3xl border border-blue-200" id="app">
+        <!-- Header with TUNELEC branding -->
+        <div class="flex flex-col sm:flex-row items-center justify-between mb-8 pb-6 border-b-2 border-blue-100">
+            <div class="flex items-center gap-4">
+                <div class="w-24 h-24 bg-white rounded-lg shadow-md flex items-center justify-center border-2 border-blue-200 overflow-hidden p-2">
+                    <img src="public/tunelec.jpg" alt="Tunelec Logo" class="w-full h-full object-contain">
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Tunelec</h1>
+                    <p class="text-sm text-gray-600">electronique</p>
+                </div>
+            </div>
+            <div class="text-right sm:text-right w-full sm:w-auto mt-4 sm:mt-0 sm:ml-4 flex-shrink-0">
+                <h2 class="text-xl font-semibold text-blue-800 text-center sm:text-right">Liste de contrôle Processus d'audit</h2>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-8 p-4 bg-gray-50 rounded-lg" id="audit-info">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Date d'audit:</label>
+                <input type="date" id="audit-date" class="w-full border rounded p-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Auditeur:</label>
+                <input type="text" id="auditeur" class="w-full border rounded p-2" required>
+            </div>            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nom de l'audité:</label>
+                <input type="text" id="audite" class="w-full border rounded p-2" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Produit:</label>
+                <input type="text" id="produit" class="w-full border rounded p-2" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Atelier:</label>
+                <select id="atelier" class="w-full border rounded p-2 bg-white mb-4" required onchange="updateZones()">
+                    <option value="">Sélectionner un atelier...</option>
+                    <option value="electronique">Électronique</option>
+                    <option value="cablage">Câblage</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Zone:</label>
+                <select id="zone" class="w-full border rounded p-2 bg-white" required disabled>
+                    <option value="">Sélectionner une zone...</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Question Section -->
+        <div class="bg-blue-50 rounded-lg p-6 mb-6">            <div class="text-xl font-bold mb-4 text-blue-900" id="step-title"></div>
+            <div id="question" class="text-lg mb-6 text-gray-800 leading-relaxed"></div>
+            
+            <!-- Question Image Container -->
+            <div id="question-image" class="mb-6 flex justify-center">
+                <!-- Image will be inserted here by JavaScript -->
+            </div>
+
+            <div class="flex gap-3 mb-6" id="answer-buttons">
+                <button class="border-2 border-green-300 px-6 py-3 rounded-lg hover:bg-green-100 transition-colors font-medium" onclick="selectAnswer('Oui')">Oui</button>
+                <button class="border-2 border-red-300 px-6 py-3 rounded-lg hover:bg-red-100 transition-colors font-medium" onclick="selectAnswer('Non')">Non</button>
+                <button class="border-2 border-gray-300 px-6 py-3 rounded-lg hover:bg-gray-100 transition-colors font-medium" onclick="selectAnswer('N/A')">N/A</button>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Action corrective/commentaire:</label>
+                <textarea id="comment" placeholder="Saisir votre commentaire ici..." class="w-full border-2 border-gray-300 rounded-lg p-3 h-24 resize-none focus:border-blue-500 focus:outline-none"></textarea>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="flex justify-between items-center">
+            <button class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-medium transition-colors" onclick="prevStep()">← Précédent</button>
+            <div class="flex-1 mx-4">
+                <div class="bg-gray-200 rounded-full h-2">
+                    <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300"></div>
+                </div>
+            </div>
+            <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed" onclick="nextStep()" id="next-btn" disabled>Suivant →</button>
+        </div>
+    </div>
+
+    <script>
+        // Zone options for each atelier
+        const zoneOptions = {
+            electronique: [
+                { value: "CMS", label: "CMS" },
+                { value: "Préparation", label: "Préparation" },
+                { value: "Insertion manuelle", label: "Insertion manuelle" },
+                { value: "Retouche/Reprise", label: "Retouche/Reprise" },
+                { value: "Test fonctionnelle", label: "Test fonctionnelle" },
+                { value: "Mise en boîtier", label: "Mise en boîtier" },
+                { value: "Contrôle finale", label: "Contrôle finale" }
+            ],            cablage: [
+                { value: "Coupe", label: "Coupe" },
+                { value: "Preparation", label: "Préparation" },
+                { value: "Montage", label: "Montage" },
+                { value: "Test", label: "Test" },
+                { value: "VIM", label: "VIM" },
+                { value: "A2E", label: "A2E" },
+                { value: "Spit", label: "Spit" },
+                { value: "Assemblage mecanique", label: "Assemblage mécanique" },
+                { value: "Emballage", label: "Emballage" }
+            ]
+        };
+
+        // Function to update zones based on selected atelier
+        function updateZones() {
+            const atelierSelect = document.getElementById('atelier');
+            const zoneSelect = document.getElementById('zone');
+            const selectedAtelier = atelierSelect.value;
+
+            // Clear and disable zone select if no atelier is selected
+            if (!selectedAtelier) {
+                zoneSelect.innerHTML = '<option value="">Sélectionner une zone...</option>';
+                zoneSelect.disabled = true;
+                return;
+            }
+
+            // Enable zone select and update options
+            zoneSelect.disabled = false;
+            
+            // Get zones for selected atelier
+            const zones = zoneOptions[selectedAtelier] || [];
+            
+            // Update zone options
+            zoneSelect.innerHTML = '<option value="">Sélectionner une zone...</option>' +
+                zones.map(zone => `<option value="${zone.value}">${zone.label}</option>`).join('');
+        }
+
+        // Questions data
+        const questions = [
+            { id: 1, question: "Les risques de sécurité sont identifiés et font l'objet d'un QRQC par le chef d'equipe,02 risque traités par mois;" },
+            { id: 2, question: "La matrice  d'utilisation des EPI est à jour sur zone , elle est respecté;" },
+            { id: 3, question: "Les instructions de travail sont disponibles, affichés et bien rangé sur poste de travail;" },
+            { id: 4, question: "Les fiches suiveuses sont renseignés et apposés par les tampons de chef d'équipe et du technicien qualité; " },
+            { id: 5, question: "Les instruction d'Ok démarrage existe sur les postes et bien renseignés;" },
+            { id: 6, question: "Le document d'Ok démarrage est validé par le chef d'équipe;" },
+            { id: 7, question: "Le tableau QCDM est propre et à jour ;" },
+            { id: 8, question: "Ouverture d'un plan d'action pour chaque dérive des indicateurs QCDM;" },
+            { id: 9, question: "Disponibilité de bac rouge sur chaque poste de travail;" },
+            { id: 10, question: "Tous piéces NC  est identifié par une étiquette rouge et écartée dans le boc rouge;" },
+            { id: 11, question: "Chaque NC fait l'objet d'un QRQC;" },
+            { id: 12, question: "La déclaration des rebuts est réalisée le jour au jour ,pas de déclaration en retard de plus de 24h,pas d'écarts;" },
+            { id: 13, question: "Travail pièce par pièce ,pas plus d'une pièce en cours de production;" },
+            { id: 14, question: "Zonning de la zone est respecté,chaque choose à une place et chaque choose est à sa place;" },
+            { id: 15, question: "Pas de mélange de pièce dans un même conditionnement ,les encours sont identifiés,pas de pièce sur table ou en dehors des emplacement prévu,les bac ne débordes pas;" },
+            { id: 16, question: "Le document Grille de Polyvalence est disponible dans l'atelier, la grille est à jour;" },
+            { id: 17, question: "Les fiches d'habilitation existent pour chaque référence et cohérent avec la grille de polyvalence;" },
+            { id: 18, question: "Aucun opérateur non habilité sur poste /sur le produit;" },
+            { id: 19, question: "Etiquette Maint Niv 02 affiché sur les postes ,bien renseigné et dans les délais;" },
+            { id: 20, question: "Fiche intervention maintenance en cas de panne est validé par la production et la qualité;" },
+            { id: 21, question: "Pas de problème maintenance reccurent dans la zone;" },
+            { id: 22, question: "Pas de fuite d'huile,d'air ou d'eau dans la zone ;" },
+            { id: 23, question: "Les encours sont stockés dans des bacs (noir pour l'électronique),aucun emballage carton ou bac verts pour les encours sur l'électronique;" },
+            { id: 24, question: "Existance d'étiquettes d'identification sur tous les contenants des encours ;" },
+            { id: 25, question: "A la fin de ligne, tous les cartons PF en cours d'emballage sont pré-identifiés par des étiquettes produits." }
+        ];        // Application state
+        let currentStep = 0;
+        const responses = questions.map(q => ({ ...q, answer: '', comment: '' }));
+
+        // Calculate compliance percentage
+        function calculatePercentage() {
+            const yesCount = responses.filter(r => r.answer === 'Oui').length;
+            const naCount = responses.filter(r => r.answer === 'N/A').length;
+            const totalApplicableQuestions = questions.length - naCount;
+              if (totalApplicableQuestions === 0) return "0.00";
+            
+            const percentage = (yesCount / totalApplicableQuestions) * 100;
+            return percentage.toFixed(2);
+        }
+
+        // Update progress bar
+        function updateProgress() {
+            const progress = ((currentStep + 1) / questions.length) * 100;
+            document.getElementById('progress-bar').style.width = progress + '%';
+        }
+
+        // Enable/disable next button based on answer
+        function updateNextButton() {
+            const nextBtn = document.getElementById('next-btn');
+            const currentResponse = responses[currentStep];
+            
+            if (currentResponse.answer) {
+                nextBtn.disabled = false;
+                nextBtn.classList.remove('disabled:bg-gray-400', 'disabled:cursor-not-allowed');
+            } else {
+                nextBtn.disabled = true;
+                nextBtn.classList.add('disabled:bg-gray-400', 'disabled:cursor-not-allowed');
+            }
+        }        // Load and display question image
+        async function loadQuestionImage(questionId) {
+            try {
+                const response = await fetch(`get_question_image.php?question_id=${questionId}`);
+                const data = await response.json();
+                const imageContainer = document.getElementById('question-image');
+                
+                if (data.success) {
+                    // Create and display the image
+                    const img = document.createElement('img');
+                    img.src = `data:${data.type};base64,${data.image}`;
+                    img.alt = `Image for question ${questionId}`;
+                    img.className = 'max-w-full h-auto rounded-lg shadow-lg cursor-pointer transition-transform hover:scale-105';
+                    img.onclick = () => {
+                        // Create fullscreen preview
+                        const preview = document.createElement('div');
+                        preview.className = 'fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50';
+                        preview.onclick = () => preview.remove();
+                        
+                        const previewImg = document.createElement('img');
+                        previewImg.src = img.src;
+                        previewImg.className = 'max-w-[90%] max-h-[90vh] object-contain';
+                        
+                        preview.appendChild(previewImg);
+                        document.body.appendChild(preview);
+                    };
+                    
+                    imageContainer.innerHTML = '';
+                    imageContainer.appendChild(img);
+                } else {
+                    imageContainer.innerHTML = ''; // Clear any previous image
+                }
+            } catch (error) {
+                console.error('Error loading image:', error);
+            }
+        }
+
+        // Render current question
+        function renderStep() {
+            document.getElementById('step-title').textContent = `Question ${currentStep + 1} / ${questions.length}`;
+            // Try to load image for current question
+            loadQuestionImage(questions[currentStep].id);
+            document.getElementById('question').textContent = questions[currentStep].question;
+            document.getElementById('comment').value = responses[currentStep].comment;
+
+            // Update button states
+            const buttons = document.querySelectorAll('#answer-buttons button');
+            buttons.forEach(btn => {
+                btn.classList.remove(
+                    'bg-green-500', 'bg-red-500', 'bg-gray-500', 
+                    'text-white', 'border-green-500', 'border-red-500', 'border-gray-500'
+                );
+                btn.classList.add('border-2');
+            });
+
+            const currentAnswer = responses[currentStep].answer;
+            if (currentAnswer === 'Oui') {
+                buttons[0].classList.add('bg-green-500', 'text-white', 'border-green-500');
+                buttons[0].classList.remove('border-green-300');
+            } else if (currentAnswer === 'Non') {
+                buttons[1].classList.add('bg-red-500', 'text-white', 'border-red-500');
+                buttons[1].classList.remove('border-red-300');
+            } else if (currentAnswer === 'N/A') {
+                buttons[2].classList.add('bg-gray-500', 'text-white', 'border-gray-500');
+                buttons[2].classList.remove('border-gray-300');
+            }
+
+            // Update next button text for last question
+            const nextBtn = document.getElementById('next-btn');
+            if (currentStep === questions.length - 1) {
+                nextBtn.textContent = 'Générer Excel';
+                nextBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                nextBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+            } else {
+                nextBtn.textContent = 'Suivant →';
+                nextBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                nextBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            }
+
+            updateProgress();
+            updateNextButton();
+        }
+
+        // Record answer selection
+        function selectAnswer(value) {
+            responses[currentStep].answer = value;
+            responses[currentStep].comment = document.getElementById('comment').value;
+
+            // Update button appearance
+            const buttons = document.querySelectorAll('#answer-buttons button');
+            buttons.forEach(btn => {
+                btn.classList.remove(
+                    'bg-green-500', 'bg-red-500', 'bg-gray-500', 
+                    'text-white', 'border-green-500', 'border-red-500', 'border-gray-500'
+                );
+            });
+
+            if (value === 'Oui') {
+                buttons[0].classList.add('bg-green-500', 'text-white', 'border-green-500');
+                buttons[0].classList.remove('border-green-300');
+            } else if (value === 'Non') {
+                buttons[1].classList.add('bg-red-500', 'text-white', 'border-red-500');
+                buttons[1].classList.remove('border-red-300');
+            } else if (value === 'N/A') {
+                buttons[2].classList.add('bg-gray-500', 'text-white', 'border-gray-500');
+                buttons[2].classList.remove('border-gray-300');
+            }
+
+            updateNextButton();
+        }
+
+        // Handle comment input
+        document.getElementById('comment').addEventListener('input', (e) => {
+            responses[currentStep].comment = e.target.value;
+        });
+
+        // Navigation functions
+        function nextStep() {
+            if (currentStep < questions.length - 1) {
+                currentStep++;
+                renderStep();
+            } else {
+                if (validateForm()) {
+                    generateExcelReport();
+                }
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 0) {
+                currentStep--;
+                renderStep();
+            }
+        }
+
+        // Validate required fields
+        function validateForm() {
+            const requiredFields = [
+                { id: 'auditeur', name: 'Auditeur' },
+                { id: 'audite', name: 'Nom de l\'audité' },
+                { id: 'zone', name: 'Zone' }
+            ];
+
+            let isValid = true;
+
+            for (let field of requiredFields) {
+                const element = document.getElementById(field.id);
+                if (!element.value.trim()) {
+                    element.style.border = '2px solid red';
+                    element.style.borderRadius = '4px';
+                    if (isValid) {
+                        element.focus();
+                    }
+                    isValid = false;
+                } else {
+                    element.style.border = '';
+                    element.style.borderRadius = '';
+                }
+            }
+
+            if (!isValid) {
+                
+                return false;
+            }
+
+            return true;
+        }
+
+        // Generate Excel report from template or create new one
+        async function generateExcelReport() {
+            try {                const auditInfo = {
+                    date: document.getElementById('audit-date').value || new Date().toISOString().split('T')[0],                    auditeur: document.getElementById('auditeur').value || '',
+                    audite: document.getElementById('audite').value || '',
+                    produit: document.getElementById('produit').value || '',
+                    zone: document.getElementById('zone').value || '',
+                    atelier: document.getElementById('atelier').value || ''
+                };
+
+                // Prepare data to send
+                const data = {
+                    auditInfo: auditInfo,
+                    responses: responses.map(r => ({
+                        question: r.question,
+                        answer: r.answer,
+                        comment: r.comment || ''
+                    }))
+                };
+
+                console.log('Sending data:', data); // Debug log
+
+                // Show loading message
+                const loadingMsg = document.createElement('div');
+                loadingMsg.textContent = 'Génération du rapport en cours...';
+                loadingMsg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1);z-index:1000;';
+                document.body.appendChild(loadingMsg);
+
+                const response = await fetch('generate_filled_excel.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                console.log('Response status:', response.status); // Debug log
+
+                // Check if the response is JSON (error) or blob (file)
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Erreur inattendue');
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const now = new Date();
+                const dateStr = now.toISOString().split('T')[0];
+                const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
+                const filename = `Audit_Tunelec_${auditInfo.zone}_${dateStr}_${timeStr}.xlsx`;
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+
+                // Remove loading message and show success
+                document.body.removeChild(loadingMsg);
+                alert('Rapport généré avec succès !');
+
+            } catch (error) {
+                console.error('Error:', error);
+                // Remove loading message if it exists
+                const loadingMsg = document.querySelector('div[style*="position:fixed"]');
+                if (loadingMsg) {
+                    document.body.removeChild(loadingMsg);
+                }
+            }
+        }
+
+        // Initialize the application
+        function init() {
+            // Set today's date as default
+            document.getElementById('audit-date').value = new Date().toISOString().split('T')[0];
+            
+            // Render first step
+            renderStep();
+        }
+
+        // Start the application when page loads
+        init();
+    </script>
+</body>
+</html>

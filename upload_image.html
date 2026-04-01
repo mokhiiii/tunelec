@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gestion des Images des Questions</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .form-container { max-width: 500px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input[type="text"], input[type="file"] { width: 100%; padding: 8px; margin-bottom: 10px; }
+        button { padding: 10px 20px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        .message { padding: 10px; margin: 10px 0; }
+        .success { background-color: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; }
+        .error { background-color: #f2dede; color: #a94442; border: 1px solid #ebccd1; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>Upload des Images pour les Questions</h2>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="question_id">ID de la Question:</label>
+                <input type="text" id="question_id" name="question_id" required 
+                       placeholder="Exemple: q1_1, q1_2, etc.">
+            </div>
+            <div class="form-group">
+                <label for="image">Image:</label>
+                <input type="file" id="image" name="image" accept="image/*" required>
+            </div>
+            <button type="submit">Upload Image</button>
+        </form>
+        <div id="message"></div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('image_handler.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                const messageDiv = document.getElementById('message');
+                messageDiv.textContent = result.message;
+                messageDiv.className = result.success ? 'message success' : 'message error';
+                
+                if (result.success) {
+                    e.target.reset();
+                }
+            } catch (error) {
+                document.getElementById('message').textContent = 'Error: ' + error.message;
+                document.getElementById('message').className = 'message error';
+            }
+        });
+    </script>
+</body>
+</html>
