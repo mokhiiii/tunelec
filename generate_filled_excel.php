@@ -4,6 +4,10 @@
  * Simplified version that works with Supabase
  */
 
+// MUST be first - no output before this
+if (ob_get_contents()) ob_end_clean();
+ob_start();
+
 require 'vendor/autoload.php';
 require 'config.php';
 
@@ -24,7 +28,6 @@ try {
     // Get input
     $input = file_get_contents('php://input');
     if (empty($input)) {
-        header('Content-Type: application/json');
         http_response_code(400);
         echo json_encode(['error' => 'No data received']);
         exit;
@@ -32,7 +35,6 @@ try {
 
     $data = json_decode($input, true);
     if (!$data) {
-        header('Content-Type: application/json');
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON']);
         exit;
@@ -115,9 +117,14 @@ try {
     $sheet->getColumnDimension('B')->setWidth(15);
     $sheet->getColumnDimension('C')->setWidth(40);
 
+    // Clear all output buffers
+    ob_end_clean();
+
     // Output file
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename="Audit_' . date('Y-m-d_H-i-s') . '.xlsx"');
+    header('Cache-Control: max-age=0');
+    header('Pragma: public');
     
     $writer = new Xlsx($spreadsheet);
     $writer->save('php://output');
@@ -125,10 +132,12 @@ try {
 
 } catch (Exception $e) {
     error_log('Excel generation error: ' . $e->getMessage());
+    ob_end_clean();
     header('Content-Type: application/json');
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
     exit;
 }
+?>
 ?>
 ?>
