@@ -1,3 +1,9 @@
+# Environment variables - NEVER commit these!
+.env
+.env.local
+.env.production.local
+.env.*.local
+
 # Ignore everything inside vendor/
 vendor/**
 
@@ -6,3 +12,22 @@ vendor/**
 
 # And don't ignore any files inside vendor/template/
 !vendor/template/**
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+new_venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
